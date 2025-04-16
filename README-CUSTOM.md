@@ -99,7 +99,11 @@ livekit:
   api_secret: your_livekit_api_secret
 ```
 
+However, this application will be running in a Kubernetes cluster and will use Kubernetes secrets instead. This means that environment variables can be used directly. For development, create a `dev.env` with the needed environment variables. 
+
 ### LiveKit Integration
+
+#### If not installed globally (through the Dockerfile):
 
 To integrate LiveKit for real-time communication:
 
@@ -115,13 +119,15 @@ gem 'livekit-server-sdk'
 bundle install
 ```
 
-3. Create a LiveKit controller:
+#### Livekit Token Controller example
+
+1. Create a LiveKit controller:
 
 ```bash
 rails generate controller LiveKit token room_name:string user_name:string
 ```
 
-4. Configure the controller to generate tokens:
+2.Configure the controller to generate tokens:
 
 ```ruby
 # app/controllers/live_kit_controller.rb
@@ -132,8 +138,8 @@ class LiveKitController < ApplicationController
     room_name = params[:room_name]
     user_name = params[:user_name]
     
-    api_key = Rails.application.credentials.livekit[:api_key]
-    api_secret = Rails.application.credentials.livekit[:api_secret]
+    api_key = ENV['LIVEKIT_API_KEY']
+    api_secret = ENV['LIVEKIT_API_SECRET']
     
     token = Livekit::AccessToken.new(api_key: api_key, api_secret: api_secret)
     token.identity = user_name
@@ -166,3 +172,48 @@ docker run -p 3000:3000 -e SECRET_KEY_BASE=your_secret_key_base ror_livekit_app
 - [Ruby on Rails Guides](https://guides.rubyonrails.org/)
 - [LiveKit Documentation](https://docs.livekit.io/)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+
+
+# Platform design 
+
+## Overall description
+- The landing page should be a login page with a form for the user to enter their username and password.
+- The user should be able to register a new account if they do not have one.
+- The landing page should have a title at the top stating "Ruby On Rails Realtime Meeting Platform using LiveKit" or something similar.
+- After login the page should show a a grid of rooms, these should be all available rooms in the livekit server. 
+- Each room should be represented by a box with the room name and participants count. 
+- Somewhere on the page there should be a button to create a new room.
+- When the user clicks on a room, they should be taken to a new page where they can join the room. The user should be prompted for a username and if they want to join with video and/or audio. In this new page they will be presented with a grid layout of all participants in the room. 
+- When the user clicks on the create room button, they should be taken to a new page where they can create a new room. The user should be prompted for a room name and username and if they want to enable video and/or audio.
+- The user can click on a room card and edit the image on the box which represents the room. The user is asked to choose an image based on images available in the postgres database. 
+
+## System Requirements Specification (SRS)
+### 1. Functional Requirements
+#### 1.1 User Authentication & Management
+- **FR1.1**: Users can register with username and password 
+- **FR1.2**: Users can log in with existing credentials
+- **FR1.3**: Users can erase their accounts
+
+#### 1.2 Meeting Functionality
+- **FR2.1**: Users can create a new meeting room
+- **FR2.2**: Users can join an existing meeting room
+- **FR2.3**: Users can leave a meeting room
+- **FR2.4**: Users can mute/unmute their audio
+- **FR2.5**: Users can start/stop their video 
+- **FR2.6**: Users can chat in a text channel
+
+
+### 2. Non-Functional Requirements
+
+#### 2.1 Usability 
+- **NFR1.1**: The application should be user-friendly and intuitive on mobile and desktop devices.
+- **NFR1.2**: Users can see the the WebRTC RTT time for each participant in the room and connection quality to each participant.
+- **NFR1.3**: Users can see all other participants in the room in a grid layout. 
+- **NFR1.4**: If a user is not sharing their video, a placeholder image should be shown.
+- **NFR1.5**: The landing page after logging in should show a grid of all available rooms.
+
+### Technical Constraints
+- **TC1**: The application must be built using Ruby on Rails.
+- **TC2**: The application must use PostgreSQL as the database.
+- **TC3**: The application must use LiveKit for real-time communication.
+- **TC4**: The application must be containerized and natively support deployment on in a Kubernetes cluster. 
