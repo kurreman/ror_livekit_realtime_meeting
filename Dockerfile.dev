@@ -18,12 +18,18 @@ ENV RAILS_ENV=development
 ENV BUNDLE_PATH=/usr/local/bundle
 ENV DATABASE_PASSWORD=password
 ENV DATABASE_USERNAME=postgres
-
+ENV LIVEKIT_API_KEY=api_key
+ENV LIVEKIT_API_SECRET=api_secretapi_secretapi_secret
+ENV LIVEKIT_URL=localhost:7880
 # Set working directory
 WORKDIR /workspace
 
 # Install Rails
-RUN gem install rails
+RUN gem install rails foreman
+
+# Bundle install all dependencies
+COPY Gemfile Gemfile.lock ./
+RUN bundle install 
 
 # Create a user with the same UID/GID as the host user
 ARG USERNAME=vscode
