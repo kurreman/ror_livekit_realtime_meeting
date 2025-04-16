@@ -1,0 +1,62 @@
+{
+    "name": "Ruby on Rails with LiveKit",
+    "dockerFile": "../Dockerfile.dev",
+    "context": "..",
+    "runArgs": [
+        "--cap-add=SYS_PTRACE",
+        "--security-opt",
+        "seccomp=unconfined",
+        "--network=host"
+    ],
+    "build": {
+        "args": {
+            "VARIANT": "development"
+        }
+    },
+    // GitHub Copilot Chat credential sharing
+    "remoteEnv": {
+        "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "Shopify.ruby-lsp",
+                "castwide.solargraph",
+                "ms-azuretools.vscode-docker",
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "esbenp.prettier-vscode",
+                "streetsidesoftware.code-spell-checker",
+                "aliariff.vscode-erb-beautify",
+                "kaiwood.endwise",
+                "aki77.rails-db-schema"
+            ],
+            "settings": {
+                "ruby.useBundler": true,
+                "ruby.useLanguageServer": true,
+                "ruby.lint": {
+                    "rubocop": true
+                },
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.organizeImports": true
+                },
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "bash",
+                        "icon": "terminal-bash"
+                    }
+                }
+            }
+        }
+    },
+    "forwardPorts": [3000],
+    "mounts": [
+        "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+        // Share Git credentials to use GitHub Copilot in container
+        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
+    ],
+    "remoteUser": "vscode",
+    "postCreateCommand": "echo 'Container is ready!'"
+}

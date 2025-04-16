@@ -1,0 +1,43 @@
+FROM ruby:3.2
+
+# Install dependencies
+RUN apt-get update -qq && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    nodejs \
+    npm \
+    postgresql-client \
+    git \
+    curl \
+    vim \
+    nano \
+    && npm install -g yarn
+
+# Set environment variables
+ENV RAILS_ENV=development
+ENV BUNDLE_PATH=/usr/local/bundle
+ENV DATABASE_PASSWORD=password
+ENV DATABASE_USERNAME=postgres
+
+# Set working directory
+WORKDIR /workspace
+
+# Install Rails
+RUN gem install rails
+
+# Create a user with the same UID/GID as the host user
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && apt-get install -y sudo \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Switch to non-root user for RUN operations
+USER $USERNAME
+
+# Set up entrypoint
+CMD ["bash"]
