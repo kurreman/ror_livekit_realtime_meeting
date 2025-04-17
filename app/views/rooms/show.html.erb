@@ -73,11 +73,11 @@
     const token = await fetchToken();
     if (!token) return;
 
-    const room = new livekit.Room({
+    const room = new LivekitClient.Room({
       // Options for audio/video capture can be set here (FR2.4, FR2.5 prompts)
        adaptiveStream: true,
        dynacast: true,
-       videoCaptureDefaults: { resolution: livekit.VideoPresets.h720.resolution },
+       videoCaptureDefaults: { resolution: LivekitClient.VideoPresets.h720.resolution },
        // Add more options as needed
     });
 
@@ -85,6 +85,10 @@
 
     // Setup event listeners BEFORE connecting
     setupRoomListeners(room);
+    
+    // Pre-warm connection for faster setup
+    room.prepareConnection(livekitUrl, token);
+    console.log("Connection pre-warmed");
 
     try {
        // Prompt user for audio/video before connecting if desired
@@ -96,9 +100,8 @@
        });
        console.log('Connected to room:', room.name);
 
-       // Publish local tracks (mic/camera)
-       await room.localParticipant.setMicrophoneEnabled(true); // FR2.4 default on
-       await room.localParticipant.setCameraEnabled(true);   // FR2.5 default on
+       // Publish local tracks (mic/camera) using the recommended method
+       await room.localParticipant.enableCameraAndMicrophone();
        updateControlsUI(); // Set initial button states
 
     } catch (error) {
@@ -111,19 +114,30 @@
   // Function to handle room events (participants joining/leaving, tracks published, etc.)
   function setupRoomListeners(room) {
     room
-      .on(livekit.RoomEvent.ParticipantConnected, handleParticipantConnected)
-      .on(livekit.RoomEvent.ParticipantDisconnected, handleParticipantDisconnected)
-      .on(livekit.RoomEvent.LocalTrackPublished, handleLocalTrackPublished)
-      .on(livekit.RoomEvent.LocalTrackUnpublished, handleLocalTrackUnpublished)
-      .on(livekit.RoomEvent.TrackSubscribed, handleTrackSubscribed)
-      .on(livekit.RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed)
-      .on(livekit.RoomEvent.DataReceived, handleDataReceived) // For chat FR2.6
-      .on(livekit.RoomEvent.Disconnected, handleDisconnect)
-      .on(livekit.RoomEvent.ConnectionQualityChanged, handleConnectionQuality); // NFR1.2
+      .on(LivekitClient.RoomEvent.ParticipantConnected, handleParticipantConnected)
+      .on(LivekitClient.RoomEvent.ParticipantDisconnected, handleParticipantDisconnected)
+      .on(LivekitClient.RoomEvent.LocalTrackPublished, handleLocalTrackPublished)
+      .on(LivekitClient.RoomEvent.LocalTrackUnpublished, handleLocalTrackUnpublished)
+      .on(LivekitClient.RoomEvent.TrackSubscribed, handleTrackSubscribed)
+      .on(LivekitClient.RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed)
+      .on(LivekitClient.RoomEvent.DataReceived, handleDataReceived) // For chat FR2.6
+      .on(LivekitClient.RoomEvent.Disconnected, handleDisconnect)
+      .on(LivekitClient.RoomEvent.ConnectionQualityChanged, handleConnectionQuality); // NFR1.2
 
-    // Handle existing participants already in the room when joining
-    room.participants.forEach(handleParticipantConnected);
-    handleParticipantConnected(room.localParticipant); // Handle local participant too
+    // // Handle existing participants already in the room when joining
+    // room.participants.forEach(handleParticipantConnected);
+    // handleParticipantConnected(room.localParticipant); // Handle local participant too
+
+    // Add a check for participants collection before using forEach
+    if (room.participants && room.participants.size > 0) {
+      // Using entries() because participants is likely a Map, not an array
+      Array.from(room.participants.values()).forEach(handleParticipantConnected);
+    }
+    
+    // Also check if localParticipant exists
+    if (room.localParticipant) {
+      handleParticipantConnected(room.localParticipant);
+    }
   }
 
   // --- Handler Functions (Implement these based on LiveKit Docs) ---
@@ -134,23 +148,27 @@
     participantDiv.id = `participant-${participant.sid}`;
     participantDiv.classList.add('participant');
     participantDiv.innerHTML = `
-        <video id="video-${participant.sid}" width="320" height="240" autoplay playsinline muted></video>
-        <audio id="audio-${participant.sid}" autoplay ${participant.isLocal ? 'muted' : ''}></audio>
+        <div class="video-container" id="video-container-${participant.sid}"></div>
+        <div class="audio-container" id="audio-container-${participant.sid}"></div>
         <div class="identity">${participant.identity}</div>
         <div class="stats" id="stats-${participant.sid}"></div>
-        <img id="placeholder-${participant.sid}" src="/path/to/placeholder.png" style="display: none; width: 320px; height: 240px;"> <%# NFR1.4 %>
+        <img id="placeholder-${participant.sid}" src="/assets/placeholder.png" style="display: none; width: 320px; height: 240px;">
     `;
     videoGrid.appendChild(participantDiv);
 
-    // Attach existing tracks
-    participant.tracks.forEach(publication => {
+    // Attach existing tracks 
+  if (participant.trackPublications) {
+    // Using the Map values properly
+    Array.from(participant.trackPublications.values()).forEach(publication => {
       if (publication.isSubscribed && publication.track) {
         handleTrackSubscribed(publication.track, publication, participant);
       }
     });
+  }
+    
     // Listen for future tracks
-    participant.on(livekit.TrackEvent.TrackSubscribed, (track, publication) => handleTrackSubscribed(track, publication, participant));
-    participant.on(livekit.TrackEvent.TrackUnsubscribed, (track, publication) => handleTrackUnsubscribed(track, publication, participant));
+    participant.on(LivekitClient.TrackEvent.TrackSubscribed, (track, publication) => handleTrackSubscribed(track, publication, participant));
+    participant.on(LivekitClient.TrackEvent.TrackUnsubscribed, (track, publication) => handleTrackUnsubscribed(track, publication, participant));
     updatePlaceholderVisibility(participant);
   }
 
@@ -180,23 +198,38 @@
 
 
   function handleTrackSubscribed(track, publication, participant) {
-    console.log(`Track subscribed: ${track.kind} from ${participant.identity}`);
-    const element = document.getElementById(`<span class="math-inline">\{track\.kind\}\-</span>{participant.sid}`);
-    if (element) {
-      track.attach(element);
+    console.log(`Track subscribed: ${track.kind} from ${participant.identity}, track ID: ${track.sid}`);
+    
+    // Use the official LiveKit method to attach tracks
+    const element = track.attach();
+    
+    // Add appropriate styling based on track type
+    if (track.kind === 'video') {
+      element.width = 320;
+      element.height = 240;
+      element.autoplay = true;
+      element.playsinline = true;
+      element.muted = true;
+      element.id = `video-${participant.sid}`;
+      document.getElementById(`video-container-${participant.sid}`).appendChild(element);
+    } else if (track.kind === 'audio') {
+      element.autoplay = true;
+      element.id = `audio-${participant.sid}`;
+      if (participant.isLocal) element.muted = true;
+      document.getElementById(`audio-container-${participant.sid}`).appendChild(element);
     }
+    
     updatePlaceholderVisibility(participant);
   }
 
   function handleTrackUnsubscribed(track, publication, participant) {
     console.log(`Track unsubscribed: ${track.kind} from ${participant.identity}`);
+    
+    // Use the official LiveKit method to detach tracks
     if (track) {
-      track.detach(); // Detach from all elements
+      track.detach();
     }
-     const element = document.getElementById(`<span class="math-inline">\{track\.kind\}\-</span>{participant.sid}`);
-     if (element && element.srcObject === track.mediaStream) {
-        element.srcObject = null; // Clear srcObject as well
-     }
+    
     updatePlaceholderVisibility(participant);
   }
 
@@ -221,10 +254,10 @@
 
   function handleConnectionQuality(quality, participant) {
       // NFR1.2 Display connection quality
-      console.log(`Connection quality for ${participant.identity}: ${livekit.ConnectionQuality[quality]}`);
+      console.log(`Connection quality for ${participant.identity}: ${LivekitClient.ConnectionQuality[quality]}`);
       const statsDiv = document.getElementById(`stats-${participant.sid}`);
       if (statsDiv) {
-          statsDiv.textContent = `Quality: ${livekit.ConnectionQuality[quality]}`;
+          statsDiv.textContent = `Quality: ${LivekitClient.ConnectionQuality[quality]}`;
           // You can get more detailed stats (RTT, jitter, packet loss) from room.participants or specific tracks
           // Example: participant.tracks.forEach(pub => { if(pub.track) console.log(pub.track.codec, pub.track.bitrate) });
           // Displaying detailed WebRTC RTT might require digging into stats - check LiveKit SDK docs/examples
@@ -234,19 +267,22 @@
 
  function updatePlaceholderVisibility(participant) {
      // NFR1.4 Show placeholder if video is disabled/unavailable
-     const videoElement = document.getElementById(`video-${participant.sid}`);
+     const videoContainer = document.getElementById(`video-container-${participant.sid}`);
      const placeholderElement = document.getElementById(`placeholder-${participant.sid}`);
-     if (!videoElement || !placeholderElement) return;
+     if (!videoContainer || !placeholderElement) return;
 
-     const videoTrack = participant.getTrackPublication(livekit.Track.Source.Camera);
-     const isVideoEnabled = videoTrack && videoTrack.isSubscribed && !videoTrack.isMuted;
+     const videoTrack = participant.getTrackPublication(LivekitClient.Track.Source.Camera);
+     const isVideoAvailable = videoTrack && videoTrack.isSubscribed && !videoTrack.isMuted;
+     const videoElement = document.getElementById(`video-${participant.sid}`);
 
-     if (isVideoEnabled && videoElement.readyState >= HTMLMediaElement.HAVE_METADATA && !videoElement.paused) {
-         videoElement.style.display = 'block';
-         placeholderElement.style.display = 'none';
+     console.log(`Video status for ${participant.identity}: available=${isVideoAvailable}, track=${videoTrack ? 'exists' : 'none'}`);
+
+     if (isVideoAvailable && videoElement) {
+       placeholderElement.style.display = 'none';
+       videoElement.style.display = 'block';
      } else {
-         videoElement.style.display = 'none';
-         placeholderElement.style.display = 'block';
+       if (videoElement) videoElement.style.display = 'none';
+       placeholderElement.style.display = 'block';
      }
  }
 
@@ -280,7 +316,7 @@
       if (currentRoom && chatInput.value) {
           const message = new TextEncoder().encode(chatInput.value);
           // Send reliably to all participants
-          currentRoom.localParticipant.publishData(message, livekit.DataPacket_Kind.RELIABLE);
+          currentRoom.localParticipant.publishData(message, LivekitClient.DataPacket_Kind.RELIABLE);
           // Display own message locally
           handleDataReceived(message, currentRoom.localParticipant);
           chatInput.value = '';
@@ -305,11 +341,3 @@
   connectToRoom();
 
 </script>
-```
-**Important:**
-* **CSRF Protection:** Notice the `X-CSRF-Token` header in the `fetchToken` function. Rails requires this for non-GET requests. Ensure your main layout (`application.html.erb`) includes `<%= csrf_meta_tags %>` in the `<head>`.
-* **LiveKit Client SDK:** You need to include the LiveKit Client SDK JavaScript file. The example uses the CDN method. Adapt if using import maps or a JS bundler.
-* **Placeholder Image:** You need to create a placeholder image (e.g., `app/assets/images/placeholder.png`) and adjust the path in `handleParticipantConnected`. Ensure it's served by Rails (check the asset pipeline guides).
-* **Error Handling:** The JS code includes basic error handling, but you'll want to make it more robust for production.
-* **WebRTC Stats (NFR1.2):** The example adds a placeholder `stats` div and logs connection quality. Displaying detailed RTT requires accessing more specific stats via the LiveKit SDK - consult their documentation for `participant.getTrackPublication(source).track.getRTCStats()`.
-* **Styling:** This view needs significant CSS (e.g., using Tailwind classes if you set it up) to achieve the grid layout and make controls look good.

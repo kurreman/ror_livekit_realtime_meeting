@@ -1,0 +1,1 @@
+- Continue in app/views/rooms/show.html.erb. Now the javascript code is working, but for soem reason permission dneied erros are happening. I think it's token stuff
