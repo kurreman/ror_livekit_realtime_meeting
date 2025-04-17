@@ -183,7 +183,7 @@ docker run -p 3000:3000 -e SECRET_KEY_BASE=your_secret_key_base ror_livekit_app
 - After login the page should show a a grid of rooms, these should be all available rooms in the livekit server. 
 - Each room should be represented by a box with the room name and participants count. 
 - Somewhere on the page there should be a button to create a new room.
-- When the user clicks on a room, they should be taken to a new page where they can join the room. The user should be prompted for a username and if they want to join with video and/or audio. In this new page they will be presented with a grid layout of all participants in the room. 
+- When the user clicks on a room, they should be taken to a new page where they can join the room. The username connected to the user login will be used and they will be prompted if they want to join with video and/or audio. In this new page they will be presented with a grid layout of all participants in the room. 
 - When the user clicks on the create room button, they should be taken to a new page where they can create a new room. The user should be prompted for a room name and username and if they want to enable video and/or audio.
 - The user can click on a room card and edit the image on the box which represents the room. The user is asked to choose an image based on images available in the postgres database. 
 

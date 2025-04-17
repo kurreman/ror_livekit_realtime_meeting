@@ -2,10 +2,10 @@ default: &default
   adapter: postgresql
   encoding: unicode
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  host: host.docker.internal  # Points to your host machine, should not be localhost; since the postgress is not running in this container
-  port: 5432
-  username: postgres          # Update as needed
-  password: password          # Update as needed
+  host: <%= ENV["DATABASE_HOST"] %>  # Points to your host machine, should not be localhost; since the postgress is not running in this container
+  port: <%= ENV["DATABASE_PORT"] %>
+  username: <%= ENV["DATABASE_USERNAME"] %>
+  password: <%= ENV["DATABASE_PASSWORD"] %>
 
 development:
   <<: *default
