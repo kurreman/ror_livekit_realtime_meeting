@@ -1,0 +1,20 @@
+<h1>Create New Room</h1>
+
+<%= form_with(model: @room, url: rooms_path, method: :post, local: true) do |form| %>
+  <%# You might need to initialize @room = Room.new in the controller if using form_with model %>
+  <%# Or use form_tag / form_with url: rooms_path %>
+
+  <div class="field">
+    <%= label_tag :room_name, "Room Name:" %>
+    <%= text_field_tag 'room[name]', nil, required: true %> <%# Ensure name matches controller permit %>
+  </div>
+
+  <%# Add fields for enabling video/audio if needed by your logic %>
+  <%# These options are usually handled client-side when joining with LiveKit %>
+
+  <div class="actions">
+    <%= submit_tag "Create Room" %>
+  </div>
+<% end %>
+
+<%= link_to "Back to Rooms", authenticated_root_path %>

@@ -1,0 +1,34 @@
+<h1>Available Rooms</h1>
+<%= link_to "Create New Room", new_room_path, class: "button" %> <%# FR2.1 %>
+<%= button_to "Logout", destroy_user_session_path, method: :delete, class: "button" %>
+
+<% if @livekit_rooms.any? %>
+  <div class="room-grid"> <%# NFR1.5 %>
+    <% @livekit_rooms.each do |room| %>
+      <div class="room-card">
+        <h2><%= room.name %></h2>
+        <p>Participants: <%= room.num_participants %></p>
+        <%# FR2.2 - Link to join the room %>
+        <%= link_to "Join Room", room_path(room.name) %>
+        <%# Add edit image button later %>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <p>No active rooms found.</p>
+<% end %>
+
+<%# Add some basic styling in app/assets/stylesheets/application.tailwind.css or similar %>
+<%# Example for grid %>
+<%#
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+.room-card {
+  border: 1px solid #ccc;
+  padding: 1rem;
+  border-radius: 8px;
+}
+%>

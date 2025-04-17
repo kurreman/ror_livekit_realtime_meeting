@@ -28,7 +28,7 @@ ENV LIVEKIT_URL=localhost:7880
 WORKDIR /workspace
 
 # Install Rails
-RUN gem install rails foreman livekit-server-sdk
+RUN gem install rails foreman livekit-server-sdk devise dotenv-rails
 
 # Bundle install all dependencies
 COPY Gemfile Gemfile.lock ./

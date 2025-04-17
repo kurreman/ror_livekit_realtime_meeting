@@ -1,0 +1,315 @@
+<h1>Room: <%= @room_name %></h1> <%# Passed from controller %>
+
+<div id="livekit-container">
+  <div id="video-grid">
+    <%# Participant videos/placeholders will be added here by JS %>
+  </div>
+  <div id="controls">
+    <button id="mic-button">Mute Mic</button>
+    <button id="video-button">Stop Video</button>
+    <button id="leave-button">Leave Room</button> <%# FR2.3 %>
+  </div>
+  <div id="chat-container"> <%# FR2.6 %>
+     <div id="chat-messages"></div>
+     <input type="text" id="chat-input" placeholder="Type message...">
+     <button id="send-chat-button">Send</button>
+  </div>
+   <div id="stats-container"> <%# NFR1.2 %>
+    <%# WebRTC stats will be displayed here %>
+  </div>
+</div>
+
+<%# Include LiveKit Client SDK (choose one method) %>
+<%# Method 1: Via CDN (simple for start) %>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+
+<%# Method 2: Via import maps (if you configured Rails 7+ with it) %>
+<%# bin/importmap pin livekit-client %>
+<%# import { Room, RoomEvent } from 'livekit-client'; %>
+
+<%# Method 3: Via esbuild/bundler (if configured) %>
+<%# yarn add livekit-client %>
+<%# import { Room, RoomEvent } from 'livekit-client'; in your app/javascript/application.js or specific pack %>
+
+<script>
+  const roomName = "<%= @room_name %>";
+  const livekitUrl = "<%= ENV['LIVEKIT_URL'] %>"; // The WSS/WS URL for clients
+  const videoGrid = document.getElementById('video-grid');
+  const micButton = document.getElementById('mic-button');
+  const videoButton = document.getElementById('video-button');
+  const leaveButton = document.getElementById('leave-button');
+  // Add chat elements...
+
+  let currentRoom = null;
+
+  // Function to fetch token from our Rails backend
+  async function fetchToken() {
+    try {
+      // Use the route we defined: POST /rooms/:id/token
+      const response = await fetch(`/rooms/${encodeURIComponent(roomName)}/token`, {
+          method: 'POST',
+          headers: {
+            // Rails CSRF token - IMPORTANT!
+            'X-CSRF-Token': document.querySelector("[name='csrf-token']").content,
+            'Accept': 'application/json'
+           }
+      });
+      if (!response.ok) {
+         const errorData = await response.json();
+         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log("Received token:", data.token); // Log token for debugging
+      return data.token;
+    } catch (error) {
+       console.error("Failed to fetch token:", error);
+       alert(`Failed to get connection token: ${error.message}`);
+       return null;
+    }
+  }
+
+  // Function to connect to LiveKit
+  async function connectToRoom() {
+    const token = await fetchToken();
+    if (!token) return;
+
+    const room = new livekit.Room({
+      // Options for audio/video capture can be set here (FR2.4, FR2.5 prompts)
+       adaptiveStream: true,
+       dynacast: true,
+       videoCaptureDefaults: { resolution: livekit.VideoPresets.h720.resolution },
+       // Add more options as needed
+    });
+
+    currentRoom = room; // Store room reference
+
+    // Setup event listeners BEFORE connecting
+    setupRoomListeners(room);
+
+    try {
+       // Prompt user for audio/video before connecting if desired
+       // This is often handled by browser permissions popup anyway
+       console.log(`Attempting to connect to room: ${roomName} at ${livekitUrl}`);
+       await room.connect(livekitUrl, token, {
+         // Request permissions immediately, adjust as needed
+         // autoSubscribe: true // Usually default
+       });
+       console.log('Connected to room:', room.name);
+
+       // Publish local tracks (mic/camera)
+       await room.localParticipant.setMicrophoneEnabled(true); // FR2.4 default on
+       await room.localParticipant.setCameraEnabled(true);   // FR2.5 default on
+       updateControlsUI(); // Set initial button states
+
+    } catch (error) {
+       console.error("Failed to connect to LiveKit room:", error);
+       alert(`Could not connect to the room: ${error.message}`);
+       currentRoom = null; // Clear room reference on failure
+    }
+  }
+
+  // Function to handle room events (participants joining/leaving, tracks published, etc.)
+  function setupRoomListeners(room) {
+    room
+      .on(livekit.RoomEvent.ParticipantConnected, handleParticipantConnected)
+      .on(livekit.RoomEvent.ParticipantDisconnected, handleParticipantDisconnected)
+      .on(livekit.RoomEvent.LocalTrackPublished, handleLocalTrackPublished)
+      .on(livekit.RoomEvent.LocalTrackUnpublished, handleLocalTrackUnpublished)
+      .on(livekit.RoomEvent.TrackSubscribed, handleTrackSubscribed)
+      .on(livekit.RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed)
+      .on(livekit.RoomEvent.DataReceived, handleDataReceived) // For chat FR2.6
+      .on(livekit.RoomEvent.Disconnected, handleDisconnect)
+      .on(livekit.RoomEvent.ConnectionQualityChanged, handleConnectionQuality); // NFR1.2
+
+    // Handle existing participants already in the room when joining
+    room.participants.forEach(handleParticipantConnected);
+    handleParticipantConnected(room.localParticipant); // Handle local participant too
+  }
+
+  // --- Handler Functions (Implement these based on LiveKit Docs) ---
+
+  function handleParticipantConnected(participant) {
+    console.log(`Participant connected: ${participant.identity}`);
+    const participantDiv = document.createElement('div');
+    participantDiv.id = `participant-${participant.sid}`;
+    participantDiv.classList.add('participant');
+    participantDiv.innerHTML = `
+        <video id="video-${participant.sid}" width="320" height="240" autoplay playsinline muted></video>
+        <audio id="audio-${participant.sid}" autoplay ${participant.isLocal ? 'muted' : ''}></audio>
+        <div class="identity">${participant.identity}</div>
+        <div class="stats" id="stats-${participant.sid}"></div>
+        <img id="placeholder-${participant.sid}" src="/path/to/placeholder.png" style="display: none; width: 320px; height: 240px;"> <%# NFR1.4 %>
+    `;
+    videoGrid.appendChild(participantDiv);
+
+    // Attach existing tracks
+    participant.tracks.forEach(publication => {
+      if (publication.isSubscribed && publication.track) {
+        handleTrackSubscribed(publication.track, publication, participant);
+      }
+    });
+    // Listen for future tracks
+    participant.on(livekit.TrackEvent.TrackSubscribed, (track, publication) => handleTrackSubscribed(track, publication, participant));
+    participant.on(livekit.TrackEvent.TrackUnsubscribed, (track, publication) => handleTrackUnsubscribed(track, publication, participant));
+    updatePlaceholderVisibility(participant);
+  }
+
+  function handleParticipantDisconnected(participant) {
+    console.log(`Participant disconnected: ${participant.identity}`);
+    const participantDiv = document.getElementById(`participant-${participant.sid}`);
+    if (participantDiv) {
+      participantDiv.remove();
+    }
+  }
+
+  function handleLocalTrackPublished(publication, participant) {
+      console.log(`Local track published: ${publication.kind}`);
+      if (publication.track) {
+          handleTrackSubscribed(publication.track, publication, participant);
+      }
+      updateControlsUI();
+      updatePlaceholderVisibility(participant);
+  }
+
+  function handleLocalTrackUnpublished(publication, participant) {
+      console.log(`Local track unpublished: ${publication.kind}`);
+      handleTrackUnsubscribed(publication.track, publication, participant)
+      updateControlsUI();
+      updatePlaceholderVisibility(participant);
+  }
+
+
+  function handleTrackSubscribed(track, publication, participant) {
+    console.log(`Track subscribed: ${track.kind} from ${participant.identity}`);
+    const element = document.getElementById(`<span class="math-inline">\{track\.kind\}\-</span>{participant.sid}`);
+    if (element) {
+      track.attach(element);
+    }
+    updatePlaceholderVisibility(participant);
+  }
+
+  function handleTrackUnsubscribed(track, publication, participant) {
+    console.log(`Track unsubscribed: ${track.kind} from ${participant.identity}`);
+    if (track) {
+      track.detach(); // Detach from all elements
+    }
+     const element = document.getElementById(`<span class="math-inline">\{track\.kind\}\-</span>{participant.sid}`);
+     if (element && element.srcObject === track.mediaStream) {
+        element.srcObject = null; // Clear srcObject as well
+     }
+    updatePlaceholderVisibility(participant);
+  }
+
+  function handleDataReceived(payload, participant) {
+    // FR2.6 Chat message handling
+    const message = new TextDecoder().decode(payload);
+    const chatMessages = document.getElementById('chat-messages');
+    const messageElement = document.createElement('div');
+    messageElement.textContent = `${participant ? participant.identity : 'System'}: ${message}`;
+    chatMessages.appendChild(messageElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+  }
+
+  function handleDisconnect() {
+    console.log('Disconnected from room.');
+    alert('You have been disconnected.');
+    // Clean up UI, maybe redirect
+    videoGrid.innerHTML = ''; // Clear grid
+    currentRoom = null;
+     // Maybe redirect: window.location.href = "/";
+  }
+
+  function handleConnectionQuality(quality, participant) {
+      // NFR1.2 Display connection quality
+      console.log(`Connection quality for ${participant.identity}: ${livekit.ConnectionQuality[quality]}`);
+      const statsDiv = document.getElementById(`stats-${participant.sid}`);
+      if (statsDiv) {
+          statsDiv.textContent = `Quality: ${livekit.ConnectionQuality[quality]}`;
+          // You can get more detailed stats (RTT, jitter, packet loss) from room.participants or specific tracks
+          // Example: participant.tracks.forEach(pub => { if(pub.track) console.log(pub.track.codec, pub.track.bitrate) });
+          // Displaying detailed WebRTC RTT might require digging into stats - check LiveKit SDK docs/examples
+      }
+  }
+
+
+ function updatePlaceholderVisibility(participant) {
+     // NFR1.4 Show placeholder if video is disabled/unavailable
+     const videoElement = document.getElementById(`video-${participant.sid}`);
+     const placeholderElement = document.getElementById(`placeholder-${participant.sid}`);
+     if (!videoElement || !placeholderElement) return;
+
+     const videoTrack = participant.getTrackPublication(livekit.Track.Source.Camera);
+     const isVideoEnabled = videoTrack && videoTrack.isSubscribed && !videoTrack.isMuted;
+
+     if (isVideoEnabled && videoElement.readyState >= HTMLMediaElement.HAVE_METADATA && !videoElement.paused) {
+         videoElement.style.display = 'block';
+         placeholderElement.style.display = 'none';
+     } else {
+         videoElement.style.display = 'none';
+         placeholderElement.style.display = 'block';
+     }
+ }
+
+
+  // --- Control Button Logic ---
+
+  micButton.onclick = () => {
+    if (!currentRoom) return;
+    const enabled = currentRoom.localParticipant.isMicrophoneEnabled;
+    currentRoom.localParticipant.setMicrophoneEnabled(!enabled);
+    updateControlsUI();
+  };
+
+  videoButton.onclick = () => {
+    if (!currentRoom) return;
+    const enabled = currentRoom.localParticipant.isCameraEnabled;
+    currentRoom.localParticipant.setCameraEnabled(!enabled);
+    updateControlsUI();
+  };
+
+  leaveButton.onclick = () => { // FR2.3
+    if (currentRoom) {
+      currentRoom.disconnect();
+    }
+  };
+
+  // FR2.6 Chat Send Button
+  const chatInput = document.getElementById('chat-input');
+  const sendChatButton = document.getElementById('send-chat-button');
+  sendChatButton.onclick = () => {
+      if (currentRoom && chatInput.value) {
+          const message = new TextEncoder().encode(chatInput.value);
+          // Send reliably to all participants
+          currentRoom.localParticipant.publishData(message, livekit.DataPacket_Kind.RELIABLE);
+          // Display own message locally
+          handleDataReceived(message, currentRoom.localParticipant);
+          chatInput.value = '';
+      }
+  };
+  chatInput.addEventListener('keypress', (event) => {
+     if (event.key === 'Enter') {
+       event.preventDefault(); // Prevent form submission if it's in a form
+       sendChatButton.click();
+     }
+  });
+
+  function updateControlsUI() {
+     if (!currentRoom) return;
+     micButton.textContent = currentRoom.localParticipant.isMicrophoneEnabled ? 'Mute Mic' : 'Unmute Mic';
+     videoButton.textContent = currentRoom.localParticipant.isCameraEnabled ? 'Stop Video' : 'Start Video';
+     // Update placeholders for local participant
+     updatePlaceholderVisibility(currentRoom.localParticipant);
+  }
+
+  // --- Initial connection ---
+  connectToRoom();
+
+</script>
+```
+**Important:**
+* **CSRF Protection:** Notice the `X-CSRF-Token` header in the `fetchToken` function. Rails requires this for non-GET requests. Ensure your main layout (`application.html.erb`) includes `<%= csrf_meta_tags %>` in the `<head>`.
+* **LiveKit Client SDK:** You need to include the LiveKit Client SDK JavaScript file. The example uses the CDN method. Adapt if using import maps or a JS bundler.
+* **Placeholder Image:** You need to create a placeholder image (e.g., `app/assets/images/placeholder.png`) and adjust the path in `handleParticipantConnected`. Ensure it's served by Rails (check the asset pipeline guides).
+* **Error Handling:** The JS code includes basic error handling, but you'll want to make it more robust for production.
+* **WebRTC Stats (NFR1.2):** The example adds a placeholder `stats` div and logs connection quality. Displaying detailed RTT requires accessing more specific stats via the LiveKit SDK - consult their documentation for `participant.getTrackPublication(source).track.getRTCStats()`.
+* **Styling:** This view needs significant CSS (e.g., using Tailwind classes if you set it up) to achieve the grid layout and make controls look good.
