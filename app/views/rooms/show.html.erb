@@ -152,7 +152,6 @@
         <div class="audio-container" id="audio-container-${participant.sid}"></div>
         <div class="identity">${participant.identity}</div>
         <div class="stats" id="stats-${participant.sid}"></div>
-        <img id="placeholder-${participant.sid}" src="/assets/placeholder.png" style="display: none; width: 320px; height: 240px;">
     `;
     videoGrid.appendChild(participantDiv);
 
@@ -200,6 +199,13 @@
   function handleTrackSubscribed(track, publication, participant) {
     console.log(`Track subscribed: ${track.kind} from ${participant.identity}, track ID: ${track.sid}`);
     
+    // Check if participant div exists first
+    let participantDiv = document.getElementById(`participant-${participant.sid}`);
+    if (!participantDiv) {
+      // If it doesn't exist yet, create it
+      handleParticipantConnected(participant);
+    }
+
     // Use the official LiveKit method to attach tracks
     const element = track.attach();
     
@@ -233,15 +239,32 @@
     updatePlaceholderVisibility(participant);
   }
 
-  function handleDataReceived(payload, participant) {
-    // FR2.6 Chat message handling
-    const message = new TextDecoder().decode(payload);
-    const chatMessages = document.getElementById('chat-messages');
-    const messageElement = document.createElement('div');
-    messageElement.textContent = `${participant ? participant.identity : 'System'}: ${message}`;
-    chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+function handleDataReceived(payload, participant) {
+  // FR2.6 Chat message handling
+  const decoder = new TextDecoder();
+  let message = decoder.decode(payload);
+  let displayMessage = message;
+  
+  // Try to parse as JSON if it looks like JSON
+  if (message.trim().startsWith('{') && message.trim().endsWith('}')) {
+    try {
+      const jsonData = JSON.parse(message);
+      // Extract the actual message content if available
+      if (jsonData.message) {
+        displayMessage = jsonData.message;
+      }
+    } catch (e) {
+      // If parsing fails, use the original message
+      console.log('Failed to parse message as JSON:', e);
+    }
   }
+  
+  const chatMessages = document.getElementById('chat-messages');
+  const messageElement = document.createElement('div');
+  messageElement.textContent = `${participant ? participant.identity : 'System'}: ${displayMessage}`;
+  chatMessages.appendChild(messageElement);
+  chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to bottom
+}
 
   function handleDisconnect() {
     console.log('Disconnected from room.');
@@ -289,17 +312,19 @@
 
   // --- Control Button Logic ---
 
-  micButton.onclick = () => {
+  micButton.onclick = async () => {
     if (!currentRoom) return;
     const enabled = currentRoom.localParticipant.isMicrophoneEnabled;
-    currentRoom.localParticipant.setMicrophoneEnabled(!enabled);
+    // This call is asyync, and we need to force the code to wait until it's complete. 
+    // Otherwise we'll get logic issues in updateControlsUI which will be called before the mic is actually muted/unmuted.
+    await currentRoom.localParticipant.setMicrophoneEnabled(!enabled);
     updateControlsUI();
   };
 
-  videoButton.onclick = () => {
+  videoButton.onclick = async () => {
     if (!currentRoom) return;
     const enabled = currentRoom.localParticipant.isCameraEnabled;
-    currentRoom.localParticipant.setCameraEnabled(!enabled);
+    await currentRoom.localParticipant.setCameraEnabled(!enabled);
     updateControlsUI();
   };
 
@@ -313,15 +338,25 @@
   const chatInput = document.getElementById('chat-input');
   const sendChatButton = document.getElementById('send-chat-button');
   sendChatButton.onclick = () => {
-      if (currentRoom && chatInput.value) {
-          const message = new TextEncoder().encode(chatInput.value);
-          // Send reliably to all participants
-          currentRoom.localParticipant.publishData(message, LivekitClient.DataPacket_Kind.RELIABLE);
-          // Display own message locally
-          handleDataReceived(message, currentRoom.localParticipant);
-          chatInput.value = '';
-      }
-  };
+    if (currentRoom && chatInput.value) {
+        // Create a simple message structure
+        const messageData = {
+            id: crypto.randomUUID(),
+            timestamp: Date.now(),
+            message: chatInput.value
+        };
+        
+        // Convert to string before encoding
+        const message = new TextEncoder().encode(JSON.stringify(messageData));
+        
+        // Send reliably to all participants
+        currentRoom.localParticipant.publishData(message, LivekitClient.DataPacket_Kind.RELIABLE);
+        
+        // Display own message locally
+        handleDataReceived(message, currentRoom.localParticipant);
+        chatInput.value = '';
+    }
+};
   chatInput.addEventListener('keypress', (event) => {
      if (event.key === 'Enter') {
        event.preventDefault(); // Prevent form submission if it's in a form

@@ -1,1 +1,2 @@
-- Continue in app/views/rooms/show.html.erb. Now the javascript code is working, but for soem reason permission dneied erros are happening. I think it's token stuff
+- When in a meeting room, there are the following issues: 
+   - The chat functionality is not working properly. When sending a message it doesnt show up in the remote lk meet, however the lk meet particpiants message shows up in the rails chat. But the rails aprticpaint mesage deosnt show up in the lk meet chat, but it shows up for everyone in the rails app. 

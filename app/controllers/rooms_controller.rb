@@ -88,8 +88,10 @@ class RoomsController < ApplicationController
     # Grant permissions to join the room
     token = LiveKit::AccessToken.new(api_key: api_key, api_secret: api_secret)
     token.identity = user_name # Use Devise user's username
-    token.add_grant(room_join: true, room: @room_name, can_publish: true, can_subscribe: true)
-
+    token.name = user_name 
+    # token.add_grant(room_join: true, room: @room_name, can_publish: true, can_subscribe: true)
+    token.video_grant = LiveKit::VideoGrant.new(roomJoin: true, room: @room_name, canPublish: true, canSubscribe: true)
+    # token.attributes = { "mykey" => "myvalue" }
     render json: { token: token.to_jwt }
 
   # rescue LiveKit::Error => e

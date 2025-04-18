@@ -12,6 +12,7 @@ Rails.application.routes.draw do
   end
   
   # Use only resource-style routes for rooms
+  # Register the token route to allow the Javascript browser client to get a token for the room from the Rails backend
   resources :rooms, only: [:index, :new, :create, :show] do
     member do
       post 'token'
