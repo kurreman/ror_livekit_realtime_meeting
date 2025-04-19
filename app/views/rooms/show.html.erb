@@ -32,6 +32,9 @@
 <%# import { Room, RoomEvent } from 'livekit-client'; in your app/javascript/application.js or specific pack %>
 
 <script>
+  if (!window.roomInitialized) {
+  window.roomInitialized = true;
+
   const roomName = "<%= @room_name %>";
   const livekitUrl = "<%= ENV['LIVEKIT_URL'] %>"; // The WSS/WS URL for clients
   const videoGrid = document.getElementById('video-grid');
@@ -273,6 +276,7 @@ function handleDataReceived(payload, participant) {
     videoGrid.innerHTML = ''; // Clear grid
     currentRoom = null;
      // Maybe redirect: window.location.href = "/";
+    window.roomInitialized = false; // Reset flag
   }
 
   function handleConnectionQuality(quality, participant) {
@@ -331,6 +335,8 @@ function handleDataReceived(payload, participant) {
   leaveButton.onclick = () => { // FR2.3
     if (currentRoom) {
       currentRoom.disconnect();
+      // Redirect to rooms index after disconnection
+    window.location.href = "/rooms";
     }
   };
 
@@ -372,7 +378,32 @@ function handleDataReceived(payload, participant) {
      updatePlaceholderVisibility(currentRoom.localParticipant);
   }
 
+  // Add this near the end of your script, inside the if(!window.roomInitialized) block
+  document.addEventListener('turbo:before-visit', function() {
+    if (currentRoom) {
+      console.log('Navigation detected, disconnecting from room');
+      currentRoom.disconnect();
+      window.roomInitialized = false;
+    }
+  });
+
+  // Also handle browser history navigation
+  window.addEventListener('popstate', function() {
+    if (currentRoom) {
+      console.log('Back/forward button pressed, disconnecting from room');
+      currentRoom.disconnect();
+      window.roomInitialized = false;
+    }
+  });
+
   // --- Initial connection ---
   connectToRoom();
 
+  // Add page unload handler to clean up resources
+  window.addEventListener('beforeunload', () => {
+    if (currentRoom) {
+      currentRoom.disconnect();
+    }
+  });
+  }
 </script>
