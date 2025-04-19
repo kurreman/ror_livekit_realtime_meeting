@@ -1,21 +1,46 @@
 <h1>Room: <%= @room_name %></h1> <%# Passed from controller %>
 
-<div id="livekit-container">
-  <div id="video-grid">
-    <%# Participant videos/placeholders will be added here by JS %>
+<div class="min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="bg-white dark:bg-gray-900 shadow-sm p-4 border-b border-gray-200 dark:border-gray-800">
+    <div class="flex justify-between items-center max-w-7xl mx-auto">
+      <h1 class="text-2xl font-semibold"><%= @room_name %></h1>
+      <button id="leave-button" class="custom-button-secondary">Leave Room</button>
+    </div>
+  </header>
+
+  <!-- Main content area - uses flex to dynamically size -->
+  <div class="flex flex-col lg:flex-row flex-1 overflow-hidden">
+    <!-- Video grid - responsive and dynamic sizing -->
+    <div id="video-container" class="flex-1 p-4 bg-gray-100 dark:bg-gray-900 overflow-auto">
+      <div id="video-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
+        <!-- Participant videos will be placed here by JS -->
+      </div>
+    </div>
+
+    <!-- Right sidebar for chat - resizes based on screen -->
+    <div id="sidebar" class="w-full lg:w-80 border-t lg:border-l border-gray-200 dark:border-gray-800 flex flex-col bg-white dark:bg-gray-900">
+      <!-- Chat header -->
+      <div class="p-4 border-b border-gray-200 dark:border-gray-800">
+        <h3 class="font-semibold">Chat</h3>
+      </div>
+      
+      <!-- Messages area - scrollable with flex-grow -->
+      <div id="chat-messages" class="flex-grow p-4 overflow-y-auto"></div>
+      
+      <!-- Chat input area - fixed at bottom -->
+      <div class="p-4 border-t border-gray-200 dark:border-gray-800 flex">
+        <input type="text" id="chat-input" placeholder="Type message..." 
+               class="custom-input flex-grow mr-2">
+        <button id="send-chat-button" class="custom-button">Send</button>
+      </div>
+    </div>
   </div>
-  <div id="controls">
+
+  <!-- Fixed control bar at bottom -->
+  <div id="controls" class="bg-white dark:bg-gray-900 p-4 border-t border-gray-200 dark:border-gray-800 flex justify-center gap-4">
     <button id="mic-button" class="custom-button">Mute Mic</button>
     <button id="video-button" class="custom-button">Stop Video</button>
-    <button id="leave-button" class="custom-button">Leave Room</button> <%# FR2.3 %>
-  </div>
-  <div id="chat-container"> <%# FR2.6 %>
-     <div id="chat-messages"></div>
-     <input type="text" id="chat-input" placeholder="Type message...">
-     <button id="send-chat-button" class="custom-button >Send</button>
-  </div>
-   <div id="stats-container"> <%# NFR1.2 %>
-    <%# WebRTC stats will be displayed here %>
   </div>
 </div>
 
@@ -156,7 +181,8 @@
         <div class="identity">${participant.identity}</div>
         <div class="stats" id="stats-${participant.sid}"></div>
     `;
-    videoGrid.appendChild(participantDiv);
+    // videoGrid.appendChild(participantDiv);
+    document.getElementById('video-grid').appendChild(participantDiv);
 
     // Attach existing tracks 
   if (participant.trackPublications) {

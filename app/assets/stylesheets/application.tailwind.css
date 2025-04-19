@@ -95,3 +95,27 @@
     }
   }
 }
+
+@layer components {
+  /* ...existing components... */
+  
+  .participant {
+    @apply relative w-full aspect-video bg-gray-800 rounded-lg overflow-hidden shadow-md;
+  }
+  
+  .video-container {
+    @apply w-full h-full flex items-center justify-center bg-gray-900;
+  }
+  
+  .participant video {
+    @apply w-full h-full object-cover;
+  }
+  
+  .participant .identity {
+    @apply absolute bottom-2 left-2 bg-black/60 text-white px-2 py-1 text-sm rounded-md;
+  }
+  
+  .participant .stats {
+    @apply absolute top-2 right-2 bg-black/60 text-white px-2 py-1 text-xs rounded-md;
+  }
+}

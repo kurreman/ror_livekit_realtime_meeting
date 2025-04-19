@@ -1,2 +1,3 @@
-- When in a meeting room, there are the following issues: 
-   - The chat functionality is not working properly. When sending a message it doesnt show up in the remote lk meet, however the lk meet particpiants message shows up in the rails chat. But the rails aprticpaint mesage deosnt show up in the lk meet chat, but it shows up for everyone in the rails app. 
+- Create Room doesnt work really. Create the room and join immidietly to allow others to join. 
+- Add a button after login to delete the account It should delete the account in the postgres database
+- Make the windows in the meeting room larger/expandable. the user should be able to resize the windows by dragging the corners of the windows.

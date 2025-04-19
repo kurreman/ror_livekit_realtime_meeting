@@ -1,20 +1,18 @@
-<h1>Create New Room</h1>
+<div class="min-h-screen flex flex-col items-center justify-center px-4">
+  <div class="custom-card w-full max-w-md">
+    <h2 class="text-center mb-6 custom-gradient-text">Create New Room</h2>
 
-<%= form_with(model: @room, url: rooms_path, method: :post, local: true) do |form| %>
-  <%# You might need to initialize @room = Room.new in the controller if using form_with model %>
-  <%# Or use form_tag / form_with url: rooms_path %>
+    <%= form_with(model: @room, url: rooms_path, method: :post, local: true) do |form| %>
+      <div class="mb-6">
+        <%= form.label :name, "Room Name", class: "block text-sm font-medium mb-1" %>
+        <%= form.text_field :name, required: true, class: "custom-input", placeholder: "Enter room name" %>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Choose a memorable name for your meeting room</p>
+      </div>
 
-  <div class="field">
-    <%= label_tag :room_name, "Room Name:" %>
-    <%= text_field_tag 'room[name]', nil, required: true %> <%# Ensure name matches controller permit %>
+      <div class="flex items-center justify-between">
+        <%= form.submit "Create Room", class: "custom-button" %>
+        <%= link_to "Cancel", authenticated_root_path, class: "custom-button-secondary" %>
+      </div>
+    <% end %>
   </div>
-
-  <%# Add fields for enabling video/audio if needed by your logic %>
-  <%# These options are usually handled client-side when joining with LiveKit %>
-
-  <div class="actions">
-    <%= submit_tag "Create Room" %>
-  </div>
-<% end %>
-
-<%= link_to "Back to Rooms", authenticated_root_path %>
+</div>
