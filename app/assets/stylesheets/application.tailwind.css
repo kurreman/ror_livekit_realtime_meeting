@@ -46,6 +46,12 @@
     @apply shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-700;
   }
   
+  .custom-button-danger {
+    @apply px-6 py-3 rounded-lg font-medium transition-all duration-300;
+    @apply bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white;
+    @apply shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-400;
+  }
+
   .custom-card {
     @apply bg-white border border-gray-200 dark:bg-gray-900 dark:border-gray-800;
     @apply p-6 rounded-2xl shadow-md hover:shadow-lg dark:shadow-lg dark:hover:shadow-xl transition-all duration-300;
