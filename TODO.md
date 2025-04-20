@@ -1,3 +1,3 @@
-- Create Room doesnt work really. Create the room and join immidietly to allow others to join. 
 - Add a button after login to delete the account It should delete the account in the postgres database
 - Make the windows in the meeting room larger/expandable. the user should be able to resize the windows by dragging the corners of the windows.
+- Cleanup and delete any unused code. Eg. new function in rooms_controller.rb

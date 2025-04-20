@@ -24,9 +24,15 @@ class RoomsController < ApplicationController
 
   def create
     @room = Room.new(room_params)
-    
     if @room.save
       # Success handling
+      begin 
+        response = @livekit_client.create_room(room_params[:name])
+      rescue => e
+        # Handle LiveKit error
+        flash.now[:alert] = "Failed to create room in LiveKit: #{e.message}"
+        @room.destroy # Rollback DB changes if LiveKit creation fails
+      end
       redirect_to rooms_path, notice: "Room was successfully created."
     else
       # Failure handling
@@ -38,29 +44,6 @@ class RoomsController < ApplicationController
     flash.now[:alert] = "Error creating room: #{e.message}"
     render :new, status: :unprocessable_entity
   end
-
-  # app/controllers/rooms_controller.rb (in create action)
-  # def create
-  #   room_name = params.require(:room).permit(:name)[:name]
-  #   begin
-  #     # Create in LiveKit
-  #     @livekit_client.create_room(name: room_name)
-
-  #     # Create in local DB (handle potential race conditions/errors)
-  #     @room = Room.find_or_create_by(name: room_name)
-  #     # Maybe set a default image_url here?
-
-  #     redirect_to authenticated_root, notice: "Room '#{room_name}' created successfully."
-  #   rescue LiveKit::Error => e
-  #     # Handle LiveKit error
-  #     # ...
-  #   rescue ActiveRecord::RecordInvalid => e
-  #     # Handle DB validation error
-  #     flash.now[:alert] = "Failed to save room data: #{e.message}"
-  #     render :new, status: :unprocessable_entity
-  #   end
-  # end
-
 
   # GET /rooms/:id (FR2.2)
   def show
