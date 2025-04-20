@@ -1,3 +1,4 @@
+- There's some weid tailwind css error. Whenever running `bin/dev` or `yarn build:css` the following error is received: `Error: Cannot apply unknown utility class: bg-white`. Running `rails s` work fine though... BUt now I cant edit CSS files.
 - Make the windows in the meeting room larger/expandable. the user should be able to resize the windows by dragging the corners of the windows.
 - Allow the users to share their screen in the meeting room.
 - Cleanup and delete any unused code. Eg. new function in rooms_controller.rb
